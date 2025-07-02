@@ -12,64 +12,37 @@ async function connectWallet() {
 }
 
 function updateFee() {
-  document.getElementById("feePreview").innerText =
-    "$" + (document.getElementById("enhSubdomain").checked ? "2.00" : "0.00");
+  const enabled = document.getElementById("enhSubdomain").checked;
+  document.getElementById("feePreview").innerText = "$" + (enabled ? "2.00" : "0.00");
 }
 
 async function registerDomain() {
   if (!AED) return alert("❌ Connect your wallet first.");
+
   const name = document.getElementById("domainName").value.trim();
   const tld = document.getElementById("tld").value;
   const enh = document.getElementById("enhSubdomain").checked;
+
   if (!name || !tld) return alert("❌ Name or TLD missing");
 
-  const fee = enh
-    ? ethers.utils.parseEther("2")
-    : ethers.BigNumber.from(0);
-  const feeEnabled = enh;
+  const mintFee = enh ? ethers.utils.parseEther("2") : ethers.BigNumber.from(0);
   const duration = ethers.BigNumber.from("3153600000");
 
   console.log("ARGS →", {
     name, tld,
-    mintFee: fee.toString(),
-    feeEnabled,
+    mintFee: mintFee.toString(),
+    feeEnabled: enh,
     duration: duration.toString(),
   });
 
-  // callStatic check
   try {
-    await AED.callStatic.registerDomain(
-      name, tld, fee, feeEnabled, duration,
-      { value: fee }
-    );
-  } catch (e) {
-    console.error("↩ callStatic revert:", e);
-    return alert("Revert reason: " + (e.reason || e.message));
-  }
-
-  // Estimate gas limit
-  let gasLimit;
-  try {
-    const est = await AED.estimateGas.registerDomain(
-      name, tld, fee, feeEnabled, duration,
-      { value: fee }
-    );
-    gasLimit = est.mul(120).div(100);
-  } catch {
-    console.warn("⚠ Using fallback gas limit 500k");
-    gasLimit = ethers.BigNumber.from(500000);
-  }
-
-  // Execute transaction
-  try {
-    const tx = await AED.registerDomain(
-      name, tld, fee, feeEnabled, duration,
-      { value: fee, gasLimit }
-    );
+    const tx = await AED.registerDomain(name, tld, mintFee, enh, duration, {
+      value: mintFee
+    });
     const receipt = await tx.wait();
-    alert("✅ Registered! TxHash: " + receipt.transactionHash);
+    alert("✅ Domain registered! Tx: " + receipt.transactionHash);
   } catch (e) {
-    console.error("❌ Tx failed:", e);
-    alert("Tx failed: " + (e.reason || e.error?.message || e.message));
+    console.error("❌ Revert:", e);
+    alert("Tx failed: " + (e.reason || e.message));
   }
 }
